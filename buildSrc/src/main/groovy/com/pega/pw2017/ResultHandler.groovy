@@ -1,7 +1,3 @@
-/*
-* Copyright (c) 2017 and Confidential to Pegasystems Inc. All rights reserved.  
-*/ 
-
 package com.pega.pw2017
 
 import org.gradle.api.Project

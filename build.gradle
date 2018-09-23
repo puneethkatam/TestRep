@@ -1,6 +1,3 @@
-/* 
-* Copyright (c) 2017 and Confidential to Pegasystems Inc. All rights reserved.  
-*/ 
 
 buildscript {
 	repositories {
@@ -31,8 +28,6 @@ import com.pega.pw2017.FileFinder
 import de.undercouch.gradle.tasks.download.Download
 import groovy.util.XmlSlurper
 import groovy.xml.XmlUtil
-import groovy.io.FileType
-import java.io.File
 
 // Import the ANT targets defined in prpcServiceUtils for application import and export
 ant.importBuild 'prpcServiceUtils/scripts/utils/prpcServiceUtilsWrapper.xml'
@@ -116,29 +111,6 @@ task fetchFromArtifactory(type: Download) {
 	group 'Pega'
 	description 'Fetch application archive from artifactory'
 
-
-	// fetch all files in this folder
-	println "Bence: current files in importfolder:"
-	def list = []
-	def dir = new File(importFolder)
-	dir.eachFileRecurse (FileType.FILES) {
-		file ->
-	  	list << file
-	}
-	// print all files in folder
-	list.each {
-  	println it.path
-	}
-	
-	doFirst {
-		println 'First clean out import folder on the Jenkins system' +importFolder
-	  File folder = new File(importFolder)
-		folder.eachFileRecurse(FileType.FILES) {
-	    file ->
-	        file.delete()
-		}
-	}
-
 	println 'Downloading artifact from : ' + artifactLocation
 	src artifactLocation
 	username artifactoryUser
@@ -146,8 +118,6 @@ task fetchFromArtifactory(type: Download) {
 	dest importFolder
 
 }
-
-
 
 
 task createRestorePoint(type: org._10ne.gradle.rest.RestTask) {
@@ -240,18 +210,14 @@ task merge(type: org._10ne.gradle.rest.RestTask) {
 	group 'Pega'
 	description 'Merge a branch.'
 
-	def branch = findProperty('branch')
-	def targetURL = findProperty('targetURL')
-	def mergePolicy = 'Highest'  //Alternative is to set it to New to create new ruleset versions on each merge
+	def branch = findProperty("branch")
+	def targetURL = findProperty("targetURL")
 
-	httpMethod = 'post'
-	uri = "${targetURL}/api/v1/branches/${branch}/merge?mergePolicy=${mergePolicy}"
+	httpMethod = 'get'
+	uri = "${targetURL}/api/v1/branches/${branch}/merge"
 
 	username = findProperty('pegaUsername')
 	password = findProperty('pegaPassword')
-	
-	requestBody = [pxObjClass: 'Pega-API-CI-Branch',
-  				   pxRulesetPassword: 'devops']
 
 	contentType = groovyx.net.http.ContentType.JSON
 	responseHandler = { response ->
@@ -310,33 +276,23 @@ task executePegaUnitTests(type: org._10ne.gradle.rest.RestTask) {
 	group 'Pega'
 	description 'Execute PegaUnit tests'
 
-	def targetURL = findProperty('targetURL')
-	def accessGroup = findProperty('accessGroup') ?:project.defaultAccessGroup
+	def targetURL = findProperty("targetURL")
+	def accessGroup = findProperty('accessGroup')
 	def testSuite = findProperty('testSuite') ? '':project.smokeTestSuite
-	def testResultLocation = findProperty('testResultLocation') ?:System.getProperty("user.dir")
-	def testResultFile = findProperty('testResultFile') ?:project.testResultFile
-	File testResultFileHandle
-	if (testResultLocation != null) {
-		testResultFileHandle = new File("${testResultLocation}/${testResultFile}")
-	}
-	else {
-		testResultFileHandle = new File("${testResultFile}")	
-	}
-	//create the file
-	testResultFileHandle.createNewFile()
+	def testResultLocation = findProperty('testResultLocation') ?:project.testResultFile
+	def testResultFile = new File("${findProperty('testResultLocation')}/${testResultFile}")
 
-    println "\nTest result file location - ${testResultFileHandle.absolutePath}"
-
-	uri = "${targetURL}/PRRestService/PegaUnit/Rule-Test-Unit-Case/pzExecuteTests?TestSuiteID=${java.net.URLEncoder.encode(testSuite, "UTF-8")}"
-	
-	// Add the access group if it is specified
+	uri = "${targetURL}/PRRestService/PegaUnit/Rule-Test-Unit-Case/pzExecuteTests"
+	if (testSuite != null) {
+		uri = uri + "?TestSuiteID=${java.net.URLEncoder.encode(testSuite, "UTF-8")}"
+	}
 	if (accessGroup != null) {
-		uri = "${uri}&AccessGroup=${java.net.URLEncoder.encode(accessGroup, "UTF-8")}"
+		println uri
+		uri = uri + "&AccessGroup=${accessGroup}"
 	}
 
 	username = findProperty('pegaUsername')
 	password = findProperty('pegaPassword')
-	
 
 	httpMethod = 'post'
 	contentType = groovyx.net.http.ContentType.XML
@@ -346,7 +302,7 @@ task executePegaUnitTests(type: org._10ne.gradle.rest.RestTask) {
 		if (response != null) {
 			println "Test Results : ${response.toString()}"
 		}
-		testResultFileHandle.write "${response.toString()}"
+		testResultFile.write response.toString()
 
 		
 		}
